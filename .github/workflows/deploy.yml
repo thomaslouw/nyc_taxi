@@ -1,0 +1,55 @@
+name: Databricks DAB CI/CD Pipeline
+
+on:
+push:
+branches:
+- main
+pull_request:
+branches:
+- main
+
+jobs:
+validate-and-test-dev:
+name: Validate and Deploy to Dev
+runs-on: ubuntu-latest
+steps:
+- name: Checkout Code
+uses: actions/checkout@v3
+
+  - name: Setup Databricks CLI
+    uses: databricks/setup-cli@v0.221.0
+
+  - name: Validate DAB Configuration
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    run: databricks bundle validate -t dev
+
+  - name: Deploy to Dev Target
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    run: databricks bundle deploy -t dev
+deploy-prod:
+name: Deploy & Run in Production
+needs: validate-and-test-dev
+if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+runs-on: ubuntu-latest
+steps:
+- name: Checkout Code
+uses: actions/checkout@v3
+
+  - name: Setup Databricks CLI
+    uses: databricks/setup-cli@v0.221.0
+
+  - name: Deploy to Prod Target
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    run: databricks bundle deploy -t prod
+
+  - name: Trigger Prod Workflow
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    run: databricks bundle run taxi_etl_job -t prod

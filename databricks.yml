@@ -1,0 +1,54 @@
+# This is a Declarative Automation Bundle definition for nyc_taxi.
+# See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
+bundle:
+  name: nyc_taxi_pipeline
+
+variables:
+  schema:
+    description: Target schema name
+
+targets:
+  dev:
+    default: true
+    workspace:
+      host: https://dbc-dc0cbedf-5d18.cloud.databricks.com
+    variables:
+      schema: dev
+
+  prod:
+    workspace:
+      host: https://dbc-dc0cbedf-5d18.cloud.databricks.com
+    variables:
+      schema: prod
+
+resources:
+  jobs:
+    taxi_etl_job:
+      name: "NYC Taxi Medallion Pipeline"
+      environments:
+        - environment_key: serverless
+          spec:
+            environment_version: "2"
+      tasks:
+        - task_key: bronze_ingest
+          environment_key: serverless
+          spark_python_task:
+            python_file: ./src/bronze.py
+            parameters:
+              - "${var.schema}"
+        - task_key: silver_transform
+          depends_on:
+            - task_key: bronze_ingest
+          environment_key: serverless
+          spark_python_task:
+            python_file: ./src/silver.py
+            parameters:
+              - "${var.schema}"
+        - task_key: gold_aggregate
+          depends_on:
+            - task_key: silver_transform
+          environment_key: serverless
+          spark_python_task:
+            python_file: ./src/gold.py
+            parameters:
+              - "${var.schema}"
